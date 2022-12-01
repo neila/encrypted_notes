@@ -1,7 +1,6 @@
 use candid::CandidType;
 use ic_cdk::export::Principal;
 use ic_cdk_macros::*;
-use serde::{Deserialize, Serialize};
 use std::collections::btree_map::Entry::*;
 use std::vec;
 use std::{cell::RefCell, collections::BTreeMap};
@@ -22,6 +21,8 @@ thread_local! {
     static NOTE_STORE: RefCell<BTreeMap<Principal, Vec<EncryptedNote>>> = RefCell::default();
     static ID_STORE: RefCell<u128> = RefCell::new(0);
 }
+
+fn main() {}
 
 #[query(name = "getDevices")]
 fn get_devices(caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
