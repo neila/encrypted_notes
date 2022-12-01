@@ -1,25 +1,20 @@
-use candid::CandidType;
+use crate::notes_store::*;
+use crate::store::NOTES_STORE;
 use ic_cdk::export::Principal;
 use ic_cdk_macros::*;
 use std::collections::btree_map::Entry::*;
-use std::vec;
 use std::{cell::RefCell, collections::BTreeMap};
+
+mod notes_store;
+mod store;
 
 type DeviceAlias = String;
 type PublicKey = String;
 
 type DeviceStore = BTreeMap<DeviceAlias, PublicKey>;
 
-#[derive(CandidType, Clone, Debug, Default)]
-pub struct EncryptedNote {
-    pub id: u128,
-    pub encrypted_text: String,
-}
-
 thread_local! {
     static DEVICE_STORE: RefCell<BTreeMap<Principal, DeviceStore>> = RefCell::default();
-    static NOTE_STORE: RefCell<BTreeMap<Principal, Vec<EncryptedNote>>> = RefCell::default();
-    static ID_STORE: RefCell<u128> = RefCell::new(0);
 }
 
 fn main() {}
@@ -53,7 +48,9 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
                 // TODO 新たにユーザーが追加できるか、量をチェック
 
                 // 既にノートが割り当てられていたらエラーとする
-                assert!(NOTE_STORE.with(|note_ref| !note_ref.borrow().contains_key(&caller)));
+                let has_note =
+                    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow().has_note(caller));
+                assert!(!has_note);
 
                 // デバイスエイリアスと公開鍵を保存する
                 let mut new_device = BTreeMap::new();
@@ -61,7 +58,8 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
                 empty_entry.insert(new_device);
 
                 // ユーザーにノートを割り当てる
-                NOTE_STORE.with(|note_ref| note_ref.borrow_mut().insert(caller, vec![]));
+                NOTES_STORE
+                    .with(|notes_store_ref| notes_store_ref.borrow_mut().assign_note(caller));
 
                 true
             }
@@ -106,13 +104,8 @@ fn delete_device(caller: Principal, device_alias: DeviceAlias) {
 #[query(name = "getNotes")]
 fn get_notes(caller: Principal) -> Vec<EncryptedNote> {
     // TODO ユーザーが登録されているかチェック
-    NOTE_STORE.with(|note_store| {
-        note_store
-            .borrow()
-            .get(&caller)
-            .cloned()
-            .unwrap_or_default()
-    })
+
+    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow().get_notes(caller))
 }
 
 #[update(name = "addNote")]
@@ -121,25 +114,11 @@ fn add_note(caller: Principal, encrypted_text: String) -> u128 {
 
     // TODO: Stringの文字数をチェック
 
-    let id = ID_STORE.with(|id_ref| {
-        let mut note_id = id_ref.borrow_mut();
-        *note_id += 1;
-        *note_id
-    });
-    println!("id: {}", id);
-
-    NOTE_STORE.with(|note_ref| {
-        let mut writer = note_ref.borrow_mut();
-
-        let user_notes = writer.get_mut(&caller).expect("No user is registered.");
-
-        // TODO: Userが所有するノート数をチェック
-
-        // IDとテキストを登録する
-        user_notes.push(EncryptedNote { id, encrypted_text });
-    });
-
-    id
+    NOTES_STORE.with(|notes_store_ref| {
+        notes_store_ref
+            .borrow_mut()
+            .add_note(caller, encrypted_text)
+    })
 }
 
 #[update(name = "updateNote")]
@@ -149,35 +128,18 @@ fn update_note(caller: Principal, update_id: u128, update_text: String) {
 
     // TODO: Stringの文字数をチェック
 
-    NOTE_STORE.with(|note_ref| {
-        let mut writer = note_ref.borrow_mut();
-
-        let notes = writer.get_mut(&caller).expect("No user is registered.");
-
-        if let Some(current_note) = notes
-            .iter_mut()
-            .find(|current_note| current_note.id == update_id)
-        {
-            current_note.encrypted_text = update_text;
-        }
-    })
+    NOTES_STORE.with(|notes_store_ref| {
+        notes_store_ref
+            .borrow_mut()
+            .update_note(caller, update_id, update_text)
+    });
 }
 
 #[update(name = "deleteNote")]
 fn delete_note(caller: Principal, delete_id: u128) {
     // TODO ユーザーが登録されているかチェック
 
-    NOTE_STORE.with(|note_ref| {
-        let mut writer = note_ref.borrow_mut();
-
-        // let user_notes = writer.get_mut(&caller).expect("No user is registered.");
-
-        // user_notes.retain(|item| item.id != delete_id);
-        writer
-            .get_mut(&caller)
-            .expect("No user is registered.")
-            .retain(|item| item.id != delete_id);
-    })
+    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow_mut().delete_note(caller, delete_id))
 }
 
 #[cfg(test)]
@@ -311,11 +273,6 @@ mod tests {
         // ノートを更新する
         let update_text = "Update text!".to_string();
 
-        // let update = EncryptedNote {
-        //     id,
-        //     encrypted_text: update_text.clone(),
-        // };
-        // update_note(principal, update);
         update_note(principal, id, update_text.clone());
 
         // ノートを再取得する
