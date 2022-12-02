@@ -1,86 +1,29 @@
+use crate::devices_store::*;
 use crate::notes_store::*;
-use crate::store::NOTES_STORE;
+use crate::store::{DEVICES_STORE, NOTES_STORE};
 use ic_cdk::export::Principal;
 use ic_cdk_macros::*;
-use std::collections::btree_map::Entry::*;
-use std::{cell::RefCell, collections::BTreeMap};
 
+mod devices_store;
 mod notes_store;
 mod store;
-
-type DeviceAlias = String;
-type PublicKey = String;
-
-type DeviceStore = BTreeMap<DeviceAlias, PublicKey>;
-
-thread_local! {
-    static DEVICE_STORE: RefCell<BTreeMap<Principal, DeviceStore>> = RefCell::default();
-}
 
 fn main() {}
 
 #[query(name = "getDevices")]
 fn get_devices(caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
     // TODO ユーザーが登録されているかチェック
-    DEVICE_STORE.with(|device_ref| {
-        let device = device_ref.borrow();
-        match device.get(&caller) {
-            Some(devices) => devices
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone()))
-                .collect::<Vec<(DeviceAlias, PublicKey)>>(),
-            None => Vec::new(),
-        }
-    })
+    DEVICES_STORE.with(|devices_store| devices_store.borrow().get_devices(caller))
 }
 
 #[update(name = "registerDevice")]
 fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: PublicKey) -> bool {
     // TODO: 登録されている`alias`と`public_key`の数をチェック
 
-    DEVICE_STORE.with(|device_ref| {
-        let mut writer = device_ref.borrow_mut();
-
-        // entry()に渡す`key`は、そのまま要素としてインサートされるので、値渡しを行う点に注意
-        match writer.entry(caller) {
-            // エントリーが空いている（ユーザーが初めてデバイスを登録する）とき
-            Vacant(empty_entry) => {
-                // TODO 新たにユーザーが追加できるか、量をチェック
-
-                // 既にノートが割り当てられていたらエラーとする
-                let has_note =
-                    NOTES_STORE.with(|notes_store| notes_store.borrow().has_note(caller));
-                assert!(!has_note);
-
-                // デバイスエイリアスと公開鍵を保存する
-                let mut new_device = BTreeMap::new();
-                new_device.insert(device_alias, public_key);
-                empty_entry.insert(new_device);
-
-                // ユーザーにノートを割り当てる
-                NOTES_STORE.with(|notes_store| notes_store.borrow_mut().assign_note(caller));
-
-                true
-            }
-            // エントリーが埋まっている（ユーザーが追加でデバイスを登録する）とき
-            Occupied(mut device_entry) => {
-                // TODO 新たにデバイスが追加できるか、一人当たりのMAX_DEVICE_COUNTをチェック
-
-                let device = device_entry.get_mut();
-                match device.entry(device_alias) {
-                    // エイリアスが未登録のとき
-                    Vacant(empty_entry) => {
-                        empty_entry.insert(public_key);
-                        true
-                    }
-                    // 既にエイリアスが登録されているとき
-                    Occupied(_) => {
-                        // 既に同じエイリアスが登録されているので、何もせずに`false`を返す
-                        false
-                    }
-                }
-            }
-        }
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow_mut()
+            .register_device(caller, device_alias, public_key)
     })
 }
 
@@ -88,16 +31,11 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
 fn delete_device(caller: Principal, device_alias: DeviceAlias) {
     // TODO ユーザーが登録されているかチェック
 
-    DEVICE_STORE.with(|device_ref| {
-        let mut writer = device_ref.borrow_mut();
-
-        let device_store = writer.get_mut(&caller).expect("No user is registered.");
-        // 登録されているデバイスが残り1個のときはエラーとする
-        assert!(device_store.len() > 1);
-
-        // デバイスの削除
-        device_store.remove(&device_alias);
-    });
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow_mut()
+            .delete_device(caller, device_alias)
+    })
 }
 
 #[query(name = "getNotes")]
@@ -117,7 +55,6 @@ fn add_note(caller: Principal, encrypted_text: String) -> u128 {
 }
 
 #[update(name = "updateNote")]
-// fn update_note(caller: Principal, update_note: EncryptedNote) {
 fn update_note(caller: Principal, update_id: u128, update_text: String) {
     // TODO ユーザーが登録されているか(匿名アカウントではないか)チェック
 
@@ -237,14 +174,12 @@ mod tests {
         // ノートを取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 2);
-        println!("{:?}", notes); // TODO delete
 
         // テキスト1を削除する
         delete_note(principal, id_1);
         // ノートを再取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
-        println!("{:?}", notes); // TODO delete
     }
 
     #[test]
@@ -263,7 +198,6 @@ mod tests {
         // ノートを取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
-        println!("{:?}", notes); // TODO delete
 
         // ノートを更新する
         let update_text = "Update text!".to_string();
@@ -274,6 +208,5 @@ mod tests {
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].encrypted_text, update_text);
-        println!("{:?}", notes); // TODO delete
     }
 }
