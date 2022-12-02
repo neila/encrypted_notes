@@ -1,26 +1,23 @@
-use candid::CandidType;
+use crate::notes_store::*;
+use crate::store::NOTES_STORE;
 use ic_cdk::export::Principal;
 use ic_cdk_macros::*;
 use std::collections::btree_map::Entry::*;
-use std::vec;
 use std::{cell::RefCell, collections::BTreeMap};
+
+mod notes_store;
+mod store;
 
 type DeviceAlias = String;
 type PublicKey = String;
 
 type DeviceStore = BTreeMap<DeviceAlias, PublicKey>;
 
-#[derive(CandidType, Clone, Debug, Default)]
-pub struct EncryptedNote {
-    pub id: u128,
-    pub encrypted_text: String,
-}
-
 thread_local! {
     static DEVICE_STORE: RefCell<BTreeMap<Principal, DeviceStore>> = RefCell::default();
-    static NOTE_STORE: RefCell<BTreeMap<Principal, Vec<EncryptedNote>>> = RefCell::default();
-    static ID_STORE: RefCell<u128> = RefCell::new(0);
 }
+
+fn main() {}
 
 #[query(name = "getDevices")]
 fn get_devices(caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
@@ -51,7 +48,9 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
                 // TODO 新たにユーザーが追加できるか、量をチェック
 
                 // 既にノートが割り当てられていたらエラーとする
-                assert!(NOTE_STORE.with(|note_ref| !note_ref.borrow().contains_key(&caller)));
+                let has_note =
+                    NOTES_STORE.with(|notes_store| notes_store.borrow().has_note(caller));
+                assert!(!has_note);
 
                 // デバイスエイリアスと公開鍵を保存する
                 let mut new_device = BTreeMap::new();
@@ -59,7 +58,7 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
                 empty_entry.insert(new_device);
 
                 // ユーザーにノートを割り当てる
-                NOTE_STORE.with(|note_ref| note_ref.borrow_mut().insert(caller, vec![]));
+                NOTES_STORE.with(|notes_store| notes_store.borrow_mut().assign_note(caller));
 
                 true
             }
@@ -99,6 +98,43 @@ fn delete_device(caller: Principal, device_alias: DeviceAlias) {
         // デバイスの削除
         device_store.remove(&device_alias);
     });
+}
+
+#[query(name = "getNotes")]
+fn get_notes(caller: Principal) -> Vec<EncryptedNote> {
+    // TODO ユーザーが登録されているかチェック
+
+    NOTES_STORE.with(|notes_store| notes_store.borrow().get_notes(caller))
+}
+
+#[update(name = "addNote")]
+fn add_note(caller: Principal, encrypted_text: String) -> u128 {
+    // TODO ユーザーが登録されているかチェック
+
+    // TODO: Stringの文字数をチェック
+
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().add_note(caller, encrypted_text))
+}
+
+#[update(name = "updateNote")]
+// fn update_note(caller: Principal, update_note: EncryptedNote) {
+fn update_note(caller: Principal, update_id: u128, update_text: String) {
+    // TODO ユーザーが登録されているか(匿名アカウントではないか)チェック
+
+    // TODO: Stringの文字数をチェック
+
+    NOTES_STORE.with(|notes_store| {
+        notes_store
+            .borrow_mut()
+            .update_note(caller, update_id, update_text)
+    });
+}
+
+#[update(name = "deleteNote")]
+fn delete_note(caller: Principal, delete_id: u128) {
+    // TODO ユーザーが登録されているかチェック
+
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().delete_note(caller, delete_id))
 }
 
 #[cfg(test)]
@@ -179,5 +215,65 @@ mod tests {
         let _res = register_device(principal, device_info.0.clone(), device_info.1.clone());
 
         delete_device(principal, device_info.0);
+    }
+
+    #[test]
+    fn add_and_delete_note() {
+        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+
+        // デバイスを登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info.0.clone(), device_info.1.clone());
+        assert!(res);
+
+        // テキスト1を追加する
+        let text_1 = "My first text!".to_string();
+        let id_1 = add_note(principal, text_1);
+
+        // テキスト2を追加する
+        let text_2 = "My second text!".to_string();
+        let _id_2 = add_note(principal, text_2);
+
+        // ノートを取得する
+        let notes = get_notes(principal);
+        assert_eq!(notes.len(), 2);
+        println!("{:?}", notes); // TODO delete
+
+        // テキスト1を削除する
+        delete_note(principal, id_1);
+        // ノートを再取得する
+        let notes = get_notes(principal);
+        assert_eq!(notes.len(), 1);
+        println!("{:?}", notes); // TODO delete
+    }
+
+    #[test]
+    fn add_and_update_note() {
+        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+
+        // デバイスを登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info.0.clone(), device_info.1.clone());
+        assert!(res);
+
+        // テキストを追加する
+        let text = "My first text!".to_string();
+        let id = add_note(principal, text);
+
+        // ノートを取得する
+        let notes = get_notes(principal);
+        assert_eq!(notes.len(), 1);
+        println!("{:?}", notes); // TODO delete
+
+        // ノートを更新する
+        let update_text = "Update text!".to_string();
+
+        update_note(principal, id, update_text.clone());
+
+        // ノートを再取得する
+        let notes = get_notes(principal);
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].encrypted_text, update_text);
+        println!("{:?}", notes); // TODO delete
     }
 }
