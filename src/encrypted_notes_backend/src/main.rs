@@ -38,7 +38,7 @@ fn delete_device(caller: Principal, device_alias: DeviceAlias) {
 fn get_notes(caller: Principal) -> Vec<EncryptedNote> {
     // TODO ユーザーが登録されているかチェック
 
-    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow().get_notes(caller))
+    NOTES_STORE.with(|notes_store| notes_store.borrow().get_notes(caller))
 }
 
 #[update(name = "addNote")]
@@ -47,11 +47,7 @@ fn add_note(caller: Principal, encrypted_text: String) -> u128 {
 
     // TODO: Stringの文字数をチェック
 
-    NOTES_STORE.with(|notes_store_ref| {
-        notes_store_ref
-            .borrow_mut()
-            .add_note(caller, encrypted_text)
-    })
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().add_note(caller, encrypted_text))
 }
 
 #[update(name = "updateNote")]
@@ -60,8 +56,8 @@ fn update_note(caller: Principal, update_id: u128, update_text: String) {
 
     // TODO: Stringの文字数をチェック
 
-    NOTES_STORE.with(|notes_store_ref| {
-        notes_store_ref
+    NOTES_STORE.with(|notes_store| {
+        notes_store
             .borrow_mut()
             .update_note(caller, update_id, update_text)
     });
@@ -71,7 +67,7 @@ fn update_note(caller: Principal, update_id: u128, update_text: String) {
 fn delete_note(caller: Principal, delete_id: u128) {
     // TODO ユーザーが登録されているかチェック
 
-    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow_mut().delete_note(caller, delete_id))
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().delete_note(caller, delete_id))
 }
 
 #[cfg(test)]
