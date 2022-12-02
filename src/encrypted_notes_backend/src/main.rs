@@ -13,15 +13,15 @@ fn main() {}
 #[query(name = "getDevices")]
 fn get_devices(caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
     // TODO ユーザーが登録されているかチェック
-    DEVICES_STORE.with(|devices_ref| devices_ref.borrow().get_devices(caller))
+    DEVICES_STORE.with(|devices_store| devices_store.borrow().get_devices(caller))
 }
 
 #[update(name = "registerDevice")]
 fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: PublicKey) -> bool {
     // TODO: 登録されている`alias`と`public_key`の数をチェック
 
-    DEVICES_STORE.with(|devices_ref| {
-        devices_ref
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
             .borrow_mut()
             .register_device(caller, device_alias, public_key)
     })
@@ -31,7 +31,11 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
 fn delete_device(caller: Principal, device_alias: DeviceAlias) {
     // TODO ユーザーが登録されているかチェック
 
-    DEVICES_STORE.with(|devices_ref| devices_ref.borrow_mut().delete_device(caller, device_alias))
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow_mut()
+            .delete_device(caller, device_alias)
+    })
 }
 
 #[query(name = "getNotes")]
