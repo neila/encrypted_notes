@@ -49,7 +49,7 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
 
                 // 既にノートが割り当てられていたらエラーとする
                 let has_note =
-                    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow().has_note(caller));
+                    NOTES_STORE.with(|notes_store| notes_store.borrow().has_note(caller));
                 assert!(!has_note);
 
                 // デバイスエイリアスと公開鍵を保存する
@@ -58,8 +58,7 @@ fn register_device(caller: Principal, device_alias: DeviceAlias, public_key: Pub
                 empty_entry.insert(new_device);
 
                 // ユーザーにノートを割り当てる
-                NOTES_STORE
-                    .with(|notes_store_ref| notes_store_ref.borrow_mut().assign_note(caller));
+                NOTES_STORE.with(|notes_store| notes_store.borrow_mut().assign_note(caller));
 
                 true
             }
@@ -105,7 +104,7 @@ fn delete_device(caller: Principal, device_alias: DeviceAlias) {
 fn get_notes(caller: Principal) -> Vec<EncryptedNote> {
     // TODO ユーザーが登録されているかチェック
 
-    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow().get_notes(caller))
+    NOTES_STORE.with(|notes_store| notes_store.borrow().get_notes(caller))
 }
 
 #[update(name = "addNote")]
@@ -114,11 +113,7 @@ fn add_note(caller: Principal, encrypted_text: String) -> u128 {
 
     // TODO: Stringの文字数をチェック
 
-    NOTES_STORE.with(|notes_store_ref| {
-        notes_store_ref
-            .borrow_mut()
-            .add_note(caller, encrypted_text)
-    })
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().add_note(caller, encrypted_text))
 }
 
 #[update(name = "updateNote")]
@@ -128,8 +123,8 @@ fn update_note(caller: Principal, update_id: u128, update_text: String) {
 
     // TODO: Stringの文字数をチェック
 
-    NOTES_STORE.with(|notes_store_ref| {
-        notes_store_ref
+    NOTES_STORE.with(|notes_store| {
+        notes_store
             .borrow_mut()
             .update_note(caller, update_id, update_text)
     });
@@ -139,7 +134,7 @@ fn update_note(caller: Principal, update_id: u128, update_text: String) {
 fn delete_note(caller: Principal, delete_id: u128) {
     // TODO ユーザーが登録されているかチェック
 
-    NOTES_STORE.with(|notes_store_ref| notes_store_ref.borrow_mut().delete_note(caller, delete_id))
+    NOTES_STORE.with(|notes_store| notes_store.borrow_mut().delete_note(caller, delete_id))
 }
 
 #[cfg(test)]
