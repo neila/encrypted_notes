@@ -55,7 +55,6 @@ fn add_note(caller: Principal, encrypted_text: String) -> u128 {
 }
 
 #[update(name = "updateNote")]
-// fn update_note(caller: Principal, update_note: EncryptedNote) {
 fn update_note(caller: Principal, update_id: u128, update_text: String) {
     // TODO ユーザーが登録されているか(匿名アカウントではないか)チェック
 
@@ -175,14 +174,12 @@ mod tests {
         // ノートを取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 2);
-        println!("{:?}", notes); // TODO delete
 
         // テキスト1を削除する
         delete_note(principal, id_1);
         // ノートを再取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
-        println!("{:?}", notes); // TODO delete
     }
 
     #[test]
@@ -201,7 +198,6 @@ mod tests {
         // ノートを取得する
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
-        println!("{:?}", notes); // TODO delete
 
         // ノートを更新する
         let update_text = "Update text!".to_string();
@@ -212,6 +208,5 @@ mod tests {
         let notes = get_notes(principal);
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].encrypted_text, update_text);
-        println!("{:?}", notes); // TODO delete
     }
 }
