@@ -1,19 +1,23 @@
 use crate::store::NOTES_STORE;
+use ic_cdk::export::serde::de::value::UsizeDeserializer;
 use ic_cdk::export::Principal;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 
+pub type EncryptedSecret = String;
 pub type DeviceAlias = String;
 pub type PublicKey = String;
 
 #[derive(Default)]
+// TODO: まとめてRefCellの方でPrincipalとマッピングしても良いかも。
 pub struct DevicesStore {
-    pub devices_store: HashMap<Principal, HashMap<DeviceAlias, PublicKey>>,
+    pub aliases: HashMap<Principal, HashMap<DeviceAlias, PublicKey>>,
+    pub keys: HashMap<Principal, HashMap<PublicKey, EncryptedSecret>>,
 }
 
 impl DevicesStore {
     pub fn get_devices(&self, caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
-        match self.devices_store.get(&caller) {
+        match self.aliases.get(&caller) {
             Some(devices) => devices
                 .iter()
                 .map(|(key, value)| (key.clone(), value.clone()))
@@ -31,7 +35,7 @@ impl DevicesStore {
         // TODO: 登録されている`alias`と`public_key`の数をチェック
 
         // entry()に渡す`key`は、そのまま要素としてインサートされるので、値渡しを行う点に注意
-        match self.devices_store.entry(caller) {
+        match self.aliases.entry(caller) {
             // エントリーが空いている（ユーザーが初めてデバイスを登録する）とき
             Vacant(empty_entry) => {
                 // TODO 新たにユーザーが追加できるか、量をチェック
@@ -75,7 +79,7 @@ impl DevicesStore {
 
     pub fn delete_device(&mut self, caller: Principal, device_alias: DeviceAlias) {
         let device_store = self
-            .devices_store
+            .aliases
             .get_mut(&caller)
             .expect("No user is registered.");
         // 登録されているデバイスが残り1個のときはエラーとする
