@@ -8,8 +8,6 @@ mod devices_store;
 mod notes_store;
 mod store;
 
-fn main() {}
-
 #[query(name = "getDevices")]
 fn get_devices(caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
     // TODO ユーザーが登録されているかチェック
@@ -35,6 +33,51 @@ fn delete_device(caller: Principal, device_alias: DeviceAlias) {
         devices_store
             .borrow_mut()
             .delete_device(caller, device_alias)
+    })
+}
+
+#[query(name = "isSeed")]
+fn is_seed(caller: Principal) -> bool {
+    DEVICES_STORE.with(|devices_store| devices_store.borrow().is_seed(caller))
+}
+
+#[update(name = "uploadSeedSecret")]
+fn upload_seed_secret(
+    caller: Principal,
+    public_key: PublicKey,
+    encrypted_secret: EncryptedSecret,
+) -> SecretResult {
+    // TODO ユーザーが登録されているかチェック
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow_mut()
+            .upload_seed_secret(caller, public_key, encrypted_secret)
+    })
+}
+
+#[update(name = "uploadEncryptedSecrets")]
+fn upload_encrypted_secrets(caller: Principal, keys: Vec<(PublicKey, EncryptedSecret)>) {
+    // TODO ユーザーが登録されているかチェック
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow_mut()
+            .upload_encrypted_secrets(caller, keys)
+    })
+}
+
+#[query(name = "getUnsyncedPublikkeys")]
+fn get_unsynced_public_keys(caller: Principal) -> Vec<PublicKey> {
+    // TODO ユーザーが登録されているかチェック
+    DEVICES_STORE.with(|devices_store| devices_store.borrow().get_unsynced_public_keys(caller))
+}
+
+#[query(name = "getEncryptedSecrets")]
+fn get_encrypted_secrets(caller: Principal, public_key: PublicKey) -> SecretResult {
+    // TODO ユーザーが登録されているかチェック
+    DEVICES_STORE.with(|devices_store| {
+        devices_store
+            .borrow()
+            .get_encrypted_secrets(caller, public_key)
     })
 }
 
@@ -83,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_register_and_get_devices() {
-        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
 
         // デバイスを登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -100,8 +143,8 @@ mod tests {
 
     #[test]
     fn test_register_and_delete_device() {
-        let device_info_1 = ("Brave".to_string(), "TEST_KEY".to_string());
-        let device_info_2 = ("Chrome".to_string(), "TEST_KEY".to_string());
+        let device_info_1 = ("Brave".to_string(), "PUBLIC_KEY".to_string());
+        let device_info_2 = ("Chrome".to_string(), "PUBLIC_KEY_2".to_string());
 
         // デバイス1を登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -127,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_register_device_duplication_err() {
-        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
 
         // デバイスを登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -143,9 +186,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: device_store.len() > 1")]
+    #[should_panic(expected = "assertion failed: user_aliases.len() > 1")]
     fn test_delete_device_err() {
-        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
 
         // デバイスを登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -156,7 +199,7 @@ mod tests {
 
     #[test]
     fn add_and_delete_note() {
-        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
 
         // デバイスを登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -184,7 +227,7 @@ mod tests {
 
     #[test]
     fn add_and_update_note() {
-        let device_info = ("Brave".to_string(), "TEST_KEY".to_string());
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
 
         // デバイスを登録する
         let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
@@ -209,4 +252,102 @@ mod tests {
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].encrypted_text, update_text);
     }
+
+    #[test]
+    fn upload_seed_secret_duplication_err() {
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
+
+        // デバイスを登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info.0.clone(), device_info.1.clone());
+        assert!(res);
+
+        let is_seed_res = is_seed(principal);
+        assert!(is_seed_res);
+
+        let secret_res = upload_seed_secret(
+            principal,
+            "PUBLIC_KEY".to_string(),
+            "TEST_SECRET".to_string(),
+        );
+        let expected_ok = Ok("Uploaded".to_string());
+        assert_eq!(secret_res, expected_ok);
+        // 2回uploadしようとするとエラー
+        let is_seed_res = is_seed(principal);
+        assert!(!is_seed_res);
+    }
+
+    #[test]
+    fn get_encrypted_secrets_unknown_err() {
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
+
+        // デバイスを登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info.0.clone(), device_info.1.clone());
+        assert!(res);
+
+        // 未登録のPublic Keyを使おうとするとエラー
+        let secret_res_err = upload_seed_secret(
+            principal,
+            "TEST_ERR_KEY".to_string(),
+            "TEST_SECRET".to_string(),
+        );
+        let expected = Err(SecretError::Unknown);
+        assert_eq!(secret_res_err, expected);
+    }
+
+    #[test]
+    fn get_encrypted_secrets_notsynced_err() {
+        let device_info = ("Brave".to_string(), "PUBLIC_KEY".to_string());
+
+        // デバイスを登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info.0.clone(), device_info.1.clone());
+        assert!(res);
+
+        // 非同期のPublic Keyに対するSecretを取得しようとするとエラー
+        let secret_res_err = get_encrypted_secrets(principal, device_info.1.clone());
+        let expected = Err(SecretError::NotSynced);
+        assert_eq!(secret_res_err, expected);
+    }
+
+    #[test]
+    fn test_upload_and_get_secret() {
+        let device_info_1 = ("Brave".to_string(), "PUBLIC_KEY".to_string());
+        let device_info_2 = ("Chrome".to_string(), "PUBLIC_KEY_2".to_string());
+
+        // デバイス1を登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info_1.0.clone(), device_info_1.1.clone());
+        assert!(res);
+
+        // デバイス2を登録する
+        let principal = Principal::from_str(TEST_ACCOUNT_1).unwrap();
+        let res = register_device(principal, device_info_2.0.clone(), device_info_2.1.clone());
+        assert!(res);
+
+        // seedをアップロードする
+        let is_seed = is_seed(principal);
+        assert!(is_seed);
+
+        // 未同期のPublic Keysを取得する
+        let unsynced_keys = get_unsynced_public_keys(principal);
+        assert_eq!(unsynced_keys.len(), 2);
+
+        // 同期したPublic KeyとEncrypted Secretをアップロードする
+        let keys: Vec<(PublicKey, EncryptedSecret)> = [
+            (device_info_1.1, "Encrypted1".to_string()),
+            (device_info_2.1.clone(), "Encrypted2".to_string()),
+        ]
+        .to_vec();
+        upload_encrypted_secrets(principal, keys);
+
+        // デバイス2が保有するPublic Keyに関連するEncrypted Secretを取得する
+        let encrypted_secret = get_encrypted_secrets(principal, device_info_2.1);
+
+        let expected = Ok("Encrypted2".to_string());
+        assert_eq!(encrypted_secret, expected);
+    }
+
+    // TODO: delete_device_and_keys
 }
