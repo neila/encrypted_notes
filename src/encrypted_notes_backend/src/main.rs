@@ -343,10 +343,17 @@ mod tests {
         upload_encrypted_secrets(principal, keys);
 
         // デバイス2が保有するPublic Keyに関連するEncrypted Secretを取得する
-        let encrypted_secret = get_encrypted_secrets(principal, device_info_2.1);
+        let encrypted_secret = get_encrypted_secrets(principal, device_info_2.1.clone());
 
         let expected = Ok("Encrypted2".to_string());
         assert_eq!(encrypted_secret, expected);
+
+        // デバイス2を削除する
+        delete_device(principal, device_info_2.0);
+        // デバイス2に関連するKeysが削除されていることを確認する
+        let encrypted_secret = get_encrypted_secrets(principal, device_info_2.1);
+        let expected_err = Err(SecretError::Unknown);
+        assert_eq!(encrypted_secret, expected_err);
     }
 
     // TODO: delete_device_and_keys
