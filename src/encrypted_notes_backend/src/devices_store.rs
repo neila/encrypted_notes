@@ -1,6 +1,7 @@
 use crate::store::NOTES_STORE;
 use candid::CandidType;
 use ic_cdk::export::Principal;
+use serde::Deserialize;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 
@@ -8,7 +9,7 @@ pub type EncryptedSecret = String;
 pub type DeviceAlias = String;
 pub type PublicKey = String;
 
-#[derive(Debug, CandidType, PartialEq, Eq)]
+#[derive(Debug, CandidType, Deserialize, PartialEq, Eq)]
 pub enum SecretError {
     Unknown,
     NotSynced,
@@ -33,6 +34,7 @@ impl DevicesStore {
         }
     }
 
+    // TODO 戻り値をResultにしても良いかも（booleanは違う気がする）
     pub fn register_device(
         &mut self,
         caller: Principal,
