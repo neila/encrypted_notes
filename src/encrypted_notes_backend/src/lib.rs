@@ -22,9 +22,24 @@ fn caller() -> Principal {
     caller
 }
 
+// ユーザー（Principal）が登録されているかを確認する関数
+//
+// [return false]
+//  register_device関数をコールしていないユーザー
+fn is_user_registered(user: Principal) -> bool {
+    DEVICES_STORE.with(|devices_store| devices_store.borrow().is_user_registered(user))
+}
+
+// 関数をコールしたユーザーを取得し、認証済みかどうかをチェックする関数
+fn get_authed_user() -> Principal {
+    let caller = caller();
+    assert!(is_user_registered(caller));
+    caller
+}
+
 #[query(name = "getDevices")]
 fn get_devices() -> Vec<(DeviceAlias, PublicKey)> {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| devices_store.borrow().get_devices(caller))
 }
@@ -43,7 +58,7 @@ fn register_device(device_alias: DeviceAlias, public_key: PublicKey) -> bool {
 
 #[update(name = "deleteDevice")]
 fn delete_device(device_alias: DeviceAlias) {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| {
         devices_store
@@ -54,7 +69,7 @@ fn delete_device(device_alias: DeviceAlias) {
 
 #[query(name = "isSeed")]
 fn is_seed() -> bool {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| devices_store.borrow().is_seed(caller))
 }
@@ -64,7 +79,7 @@ fn upload_seed_secret(
     public_key: PublicKey,
     encrypted_secret: EncryptedSecret,
 ) -> UploadSecretResult {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| {
         devices_store
@@ -75,7 +90,7 @@ fn upload_seed_secret(
 
 #[update(name = "uploadEncryptedSecrets")]
 fn upload_encrypted_secrets(keys: Vec<(PublicKey, EncryptedSecret)>) {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| {
         devices_store
@@ -86,14 +101,14 @@ fn upload_encrypted_secrets(keys: Vec<(PublicKey, EncryptedSecret)>) {
 
 #[query(name = "getUnsyncedPublicKeys")]
 fn get_unsynced_public_keys() -> Vec<PublicKey> {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| devices_store.borrow().get_unsynced_public_keys(caller))
 }
 
 #[query(name = "getEncryptedSecrets")]
 fn get_encrypted_secrets(public_key: PublicKey) -> GetSecretResult {
-    let caller = caller();
+    let caller = get_authed_user();
 
     DEVICES_STORE.with(|devices_store| {
         devices_store
@@ -104,14 +119,14 @@ fn get_encrypted_secrets(public_key: PublicKey) -> GetSecretResult {
 
 #[query(name = "getNotes")]
 fn get_notes() -> Vec<EncryptedNote> {
-    let caller = caller();
+    let caller = get_authed_user();
 
     NOTES_STORE.with(|notes_store| notes_store.borrow().get_notes(caller))
 }
 
 #[update(name = "addNote")]
 fn add_note(encrypted_text: String) -> u128 {
-    let caller = caller();
+    let caller = get_authed_user();
 
     // TODO: Stringの文字数をチェック
 
@@ -120,7 +135,7 @@ fn add_note(encrypted_text: String) -> u128 {
 
 #[update(name = "updateNote")]
 fn update_note(update_id: u128, update_text: String) {
-    let caller = caller();
+    let caller = get_authed_user();
     // TODO: Stringの文字数をチェック
 
     NOTES_STORE.with(|notes_store| {
@@ -132,7 +147,7 @@ fn update_note(update_id: u128, update_text: String) {
 
 #[update(name = "deleteNote")]
 fn delete_note(delete_id: u128) {
-    let caller = caller();
+    let caller = get_authed_user();
 
     NOTES_STORE.with(|notes_store| notes_store.borrow_mut().delete_note(caller, delete_id))
 }

@@ -25,6 +25,10 @@ pub struct DevicesStore {
 }
 
 impl DevicesStore {
+    pub fn is_user_registered(&self, user: Principal) -> bool {
+        self.aliases.contains_key(&user)
+    }
+
     pub fn get_devices(&self, caller: Principal) -> Vec<(DeviceAlias, PublicKey)> {
         match self.aliases.get(&caller) {
             Some(devices) => devices

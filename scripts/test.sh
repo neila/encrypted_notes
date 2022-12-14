@@ -18,7 +18,10 @@ rustup target add wasm32-unknown-unknown
 ## Trouble `sh: webpack: command not found`
 # npm install
 
-# Setup default user principal
+# Setup user principal
+# Panicチェックで使用するユーザーを作成する
+dfx identity new --disable-encryption unregistered_user
+# デプロイ等に使用するdefaultユーザーをセットする
 dfx identity use default
 export ROOT_PRINCIPAL=$(dfx identity get-principal)
 
@@ -158,7 +161,14 @@ else
     echo Error
 fi
 
-# TODO: 登録していないPrincipalで操作しようとする 
+# 登録していないPrincipalで操作しようとする
+echo "PANICKED TEST 2: "
+PANICKED_MSG_1=`dfx --identity unregistered_user canister call encrypted_notes_backend getNotes 2>&1`
+if [ $? -eq 255 ]; then
+    echo Ok
+else
+    echo Error
+fi
 
 # [鍵に関するエラー]
 # 1つしか登録されていないデバイスを削除する
@@ -169,3 +179,6 @@ if [ $? -eq 255 ]; then
 else
     echo Error
 fi
+
+# 後処理
+dfx identity remove unregistered_user
