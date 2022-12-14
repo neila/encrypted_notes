@@ -60,7 +60,10 @@ fn is_seed() -> bool {
 }
 
 #[update(name = "uploadSeedSecret")]
-fn upload_seed_secret(public_key: PublicKey, encrypted_secret: EncryptedSecret) -> SecretResult {
+fn upload_seed_secret(
+    public_key: PublicKey,
+    encrypted_secret: EncryptedSecret,
+) -> UploadSecretResult {
     let caller = caller();
 
     DEVICES_STORE.with(|devices_store| {
@@ -89,7 +92,7 @@ fn get_unsynced_public_keys() -> Vec<PublicKey> {
 }
 
 #[query(name = "getEncryptedSecrets")]
-fn get_encrypted_secrets(public_key: PublicKey) -> SecretResult {
+fn get_encrypted_secrets(public_key: PublicKey) -> GetSecretResult {
     let caller = caller();
 
     DEVICES_STORE.with(|devices_store| {

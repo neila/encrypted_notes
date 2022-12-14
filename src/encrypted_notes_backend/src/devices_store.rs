@@ -15,7 +15,8 @@ pub enum SecretError {
     NotSynced,
 }
 
-pub type SecretResult = Result<EncryptedSecret, SecretError>;
+pub type UploadSecretResult = Result<(), SecretError>;
+pub type GetSecretResult = Result<EncryptedSecret, SecretError>;
 
 #[derive(Default)]
 pub struct DevicesStore {
@@ -34,7 +35,6 @@ impl DevicesStore {
         }
     }
 
-    // TODO 戻り値をResultにしても良いかも（booleanは違う気がする）
     pub fn register_device(
         &mut self,
         caller: Principal,
@@ -122,7 +122,7 @@ impl DevicesStore {
         caller: Principal,
         public_key: PublicKey,
         encrypted_secret: EncryptedSecret,
-    ) -> SecretResult {
+    ) -> UploadSecretResult {
         let user_aliases = self.aliases.get(&caller).expect("No user is registered.");
 
         if !Self::is_known_public_key(user_aliases, public_key.clone()) {
@@ -131,7 +131,7 @@ impl DevicesStore {
 
         let user_keys = self.keys.get_mut(&caller).expect("No user is registered.");
         user_keys.insert(public_key, encrypted_secret);
-        Ok("Uploaded".to_string())
+        Ok(())
     }
     // まだ同期されていないデバイスの公開鍵を返す関数
     pub fn get_unsynced_public_keys(&self, caller: Principal) -> Vec<PublicKey> {
@@ -170,7 +170,11 @@ impl DevicesStore {
     // Principal: ユーザーが存在するかどうかをチェックで弾かれる
     // PublicKey: キーがあるかどうかでチェック弾かれる
     // EncryptedSecret: getしたときに、なかったら（からだったら）弾かれる
-    pub fn get_encrypted_secrets(&self, caller: Principal, public_key: PublicKey) -> SecretResult {
+    pub fn get_encrypted_secrets(
+        &self,
+        caller: Principal,
+        public_key: PublicKey,
+    ) -> GetSecretResult {
         // DEVICE_STOREに保存されていないPublic Keyのとき
         let user_aliases = self.aliases.get(&caller).expect("No user is registered.");
         if !Self::is_known_public_key(user_aliases, public_key.clone()) {

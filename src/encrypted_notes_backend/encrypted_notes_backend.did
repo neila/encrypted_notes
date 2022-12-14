@@ -13,7 +13,13 @@ type SecretError =
    NotSynced;
  };
 
-type SecretResult = 
+ type UploadSecretResult = 
+  variant {
+    Ok;
+    Err: SecretError;
+  };
+
+type GetSecretResult = 
  variant {
    Ok: EncryptedSecret;
    Err: SecretError;
@@ -24,10 +30,10 @@ service : {
     "registerDevice": (DeviceAlias, PublicKey) -> (bool);
     "deleteDevice": (DeviceAlias) -> ();
     "isSeed": () -> (bool);
-    "uploadSeedSecret": (PublicKey, EncryptedSecret) -> (SecretResult);
+    "uploadSeedSecret": (PublicKey, EncryptedSecret) -> (UploadSecretResult);
     "getUnsyncedPublicKeys": () -> (vec PublicKey) query;
     "uploadEncryptedSecrets": (vec record {PublicKey; EncryptedSecret;}) -> ();
-    "getEncryptedSecrets": (PublicKey) -> (SecretResult) query;
+    "getEncryptedSecrets": (PublicKey) -> (GetSecretResult) query;
     "getNotes": () -> (vec EncryptedNote) query;
     "addNote": (text) -> (nat);
     "updateNote": (nat, text) -> ();
