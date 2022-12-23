@@ -2,24 +2,41 @@
   "name": "encrypted_notes_frontend",
   "version": "0.1.0",
   "description": "Internet Computer starter application",
-  "keywords": ["Internet Computer", "Motoko", "JavaScript", "Canister"],
+  "keywords": [
+    "Internet Computer",
+    "Motoko",
+    "JavaScript",
+    "Canister"
+  ],
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
   "scripts": {
     "build": "webpack",
     "prebuild": "npm run generate",
     "start": "webpack serve --mode development --env development",
     "prestart": "npm run generate",
-    "generate": "dfx generate encrypted_notes_backend"
+    "generate": "dfx generate encrypted_notes_backend",
+    "lint": "eslint --ignore-path .gitignore --ext .ts,.tsx,.js,.jsx .",
+    "lint:fix": "",
+    "prettier": "prettier --ignore-unknown --no-error-on-unmatched-pattern --ignore-path .gitignore --write ."
   },
   "devDependencies": {
     "@dfinity/agent": "0.15.1",
     "@dfinity/candid": "0.15.1",
     "@dfinity/principal": "0.15.1",
+    "@typescript-eslint/eslint-plugin": "^5.47.0",
     "assert": "2.0.0",
     "buffer": "6.0.3",
     "copy-webpack-plugin": "^11.0.0",
+    "eslint": "^8.30.0",
     "events": "3.3.0",
     "html-webpack-plugin": "5.5.0",
+    "lint-staged": "^13.1.0",
+    "pre-commit": "^1.2.2",
+    "prettier": "^2.8.1",
     "process": "0.11.10",
+    "simple-git-hooks": "^2.8.1",
     "stream-browserify": "3.0.0",
     "terser-webpack-plugin": "^5.3.3",
     "util": "0.12.4",

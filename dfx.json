@@ -6,9 +6,7 @@
       "type": "rust"
     },
     "encrypted_notes_frontend": {
-      "dependencies": [
-        "encrypted_notes_backend"
-      ],
+      "dependencies": ["encrypted_notes_backend"],
       "frontend": {
         "entrypoint": "src/encrypted_notes_frontend/src/index.html"
       },
